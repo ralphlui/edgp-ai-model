@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+great_expectations
+pandas
