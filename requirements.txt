@@ -1,5 +1,6 @@
 fastapi
-uvicorn[standard]
+uvicorn
+great_expectations
 pandas
 numpy
 scikit-learn
