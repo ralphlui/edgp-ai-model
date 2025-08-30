@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  edgp-ai-model:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://edgp:edgp123@postgres:5432/edgp_ai
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/app/data
+    networks:
+      - edgp-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: edgp_ai
+      POSTGRES_USER: edgp
+      POSTGRES_PASSWORD: edgp123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - edgp-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - edgp-network
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - edgp-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  edgp-network:
+    driver: bridge
