@@ -9,28 +9,18 @@ services:
       - ENVIRONMENT=development
       - DEBUG=true
       - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://edgp:edgp123@postgres:5432/edgp_ai
       - REDIS_URL=redis://redis:6379/0
+      # AWS credentials for external communication
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
     env_file:
       - .env
     depends_on:
-      - postgres
       - redis
     volumes:
       - ./data:/app/data
-    networks:
-      - edgp-network
-
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: edgp_ai
-      POSTGRES_USER: edgp
-      POSTGRES_PASSWORD: edgp123
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./logs:/app/logs
     networks:
       - edgp-network
 
@@ -56,7 +46,6 @@ services:
       - monitoring
 
 volumes:
-  postgres_data:
   redis_data:
 
 networks:

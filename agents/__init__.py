@@ -1,32 +1,10 @@
 """
-Agents module for EDGP AI Model service.
-Contains all specialized agents for master data management.
+Agent implementations for different specializations.
+Individual agents can be imported directly from their modules.
 """
 
-from .policy_suggestion import PolicySuggestionAgent
-from .data_privacy_compliance import DataPrivacyComplianceAgent
-from .data_quality import DataQualityAgent
-from .data_remediation import DataRemediationAgent
-from .analytics import AnalyticsAgent
+# Note: Import agents individually from their modules to avoid circular dependencies
+# Example:
+# from agents.data_quality.agent import DataQualityAgent
 
-__all__ = [
-    "PolicySuggestionAgent",
-    "DataPrivacyComplianceAgent", 
-    "DataQualityAgent",
-    "DataRemediationAgent",
-    "AnalyticsAgent"
-]
-
-from .policy_suggestion import PolicySuggestionAgent
-from .data_privacy_compliance import DataPrivacyComplianceAgent
-from .data_quality import DataQualityAgent
-from .data_remediation import DataRemediationAgent
-from .analytics import AnalyticsAgent
-
-__all__ = [
-    "PolicySuggestionAgent",
-    "DataPrivacyComplianceAgent", 
-    "DataQualityAgent",
-    "DataRemediationAgent",
-    "AnalyticsAgent"
-]
+__all__ = []

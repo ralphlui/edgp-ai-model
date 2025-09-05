@@ -9,8 +9,8 @@ This agent is responsible for:
 
 from typing import Dict, List, Any, Optional
 import logging
-from ..core.agent_base import BaseAgent, AgentCapability
-from ..core.llm_gateway import LLMGateway, LLMProvider
+from core.agents.base import BaseAgent
+from core.types.agent_types import AgentCapability
 
 logger = logging.getLogger(__name__)
 
