@@ -2,13 +2,14 @@
 Base agent class and common agent utilities.
 Provides standardized interface and shared functionality for all agents.
 Enhanced with LangChain, LangGraph, and RAG integration.
+Updated with standardized communication types following agentic AI best practices.
 """
 
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TypeVar, Generic
 from enum import Enum
 import logging
 
@@ -23,9 +24,16 @@ from pydantic import BaseModel, Field
 from ..infrastructure.config import settings
 from ..types.agent_types import AgentCapability, AgentStatus
 from ..types.base import AgentType
+from ..types.communication import (
+    StandardAgentInput, StandardAgentOutput, AgentContext, AgentMetadata,
+    ProcessingResult, AgentError, MessageType, OperationType, ProcessingStage,
+    TaskStatus, Priority, ConfidenceLevel, create_standard_output, create_agent_error
+)
 
 logger = logging.getLogger(__name__)
 
+
+T = TypeVar('T')  # Generic type for typed inputs/outputs
 
 class AgentState(BaseModel):
     """LangGraph state for agent workflows."""
@@ -39,63 +47,61 @@ class AgentState(BaseModel):
         arbitrary_types_allowed = True
 
 
-class AgentMessage:
-    """Standardized message format for inter-agent communication."""
+class StandardizedAgentMessage(BaseModel):
+    """Standardized message format using new communication types."""
     
-    def __init__(
-        self,
-        sender: str,
-        recipient: str,
-        message_type: str,
-        content: Dict[str, Any],
-        correlation_id: Optional[str] = None,
-        timestamp: Optional[datetime] = None
-    ):
-        self.id = str(uuid.uuid4())
-        self.sender = sender
-        self.recipient = recipient
-        self.message_type = message_type
-        self.content = content
-        self.correlation_id = correlation_id or str(uuid.uuid4())
-        self.timestamp = timestamp or datetime.utcnow()
+    message_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    message_type: MessageType
+    sender_id: str
+    recipient_id: str
+    capability_name: str
+    content: Dict[str, Any]
+    context: AgentContext
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    priority: Priority = Priority.MEDIUM
     
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "sender": self.sender,
-            "recipient": self.recipient,
-            "message_type": self.message_type,
-            "content": self.content,
-            "correlation_id": self.correlation_id,
-            "timestamp": self.timestamp.isoformat()
-        }
+        return self.dict()
 
 
-class AgentTask:
-    """Represents a task to be executed by an agent."""
+class StandardizedAgentTask(BaseModel):
+    """Standardized task representation using new communication types."""
     
-    def __init__(
-        self,
-        task_type: str,
-        data: Dict[str, Any],
-        priority: int = 1,
-        timeout: Optional[int] = None
-    ):
-        self.id = str(uuid.uuid4())
-        self.task_type = task_type
-        self.data = data
-        self.priority = priority
-        self.timeout = timeout or settings.agent_timeout
-        self.created_at = datetime.utcnow()
-        self.status = AgentStatus.IDLE
-        self.result: Optional[Dict[str, Any]] = None
-        self.error: Optional[str] = None
+    task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    capability: AgentCapability
+    input_data: StandardAgentInput
+    status: TaskStatus = TaskStatus.PENDING
+    priority: Priority = Priority.MEDIUM
+    
+    # Execution tracking
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    
+    # Results
+    output_data: Optional[StandardAgentOutput] = None
+    error: Optional[AgentError] = None
+    
+    def mark_started(self):
+        self.status = TaskStatus.IN_PROGRESS
+        self.started_at = datetime.utcnow()
+    
+    def mark_completed(self, output: StandardAgentOutput):
+        self.status = TaskStatus.COMPLETED
+        self.completed_at = datetime.utcnow()
+        self.output_data = output
+    
+    def mark_failed(self, error: AgentError):
+        self.status = TaskStatus.FAILED
+        self.completed_at = datetime.utcnow()
+        self.error = error
 
 
-class BaseAgent(ABC):
+class BaseAgent(ABC, Generic[T]):
     """
     Base class for all agents in the system with LangChain/LangGraph integration.
     Provides common functionality and standardized interface.
+    Enhanced with standardized communication types following agentic AI best practices.
     """
     
     def __init__(
@@ -111,7 +117,11 @@ class BaseAgent(ABC):
         self.name = name
         self.description = description
         self.system_prompt = system_prompt
-        self.id = str(uuid.uuid4())
+        
+        # Set agent_id if not defined as a property in subclass
+        if not hasattr(type(self), 'agent_id') or not isinstance(getattr(type(self), 'agent_id'), property):
+            self.agent_id = str(uuid.uuid4())
+        
         self.capabilities = capabilities or []
         self.status = AgentStatus.INITIALIZING
         self.created_at = datetime.utcnow()
@@ -121,9 +131,18 @@ class BaseAgent(ABC):
         self._rag_system = None
         self.enable_rag = enable_rag
         
-        # Queues for messages and tasks
-        self.message_queue: List[AgentMessage] = []
-        self.task_queue: List[AgentTask] = []
+        # Queues for standardized messages and tasks
+        self.message_queue: List[StandardizedAgentMessage] = []
+        self.task_queue: List[StandardizedAgentTask] = []
+        
+        # Performance tracking
+        self.execution_metrics = {
+            "total_requests": 0,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "average_response_time": 0.0,
+            "total_tokens_used": 0
+        }
         
         # Initialize workflow
         self._initialize_workflow()
@@ -131,7 +150,7 @@ class BaseAgent(ABC):
         # Set status to idle after initialization
         self.status = AgentStatus.IDLE
         
-        logger.info(f"Initialized agent: {self.name} (ID: {self.id})")
+        logger.info(f"Initialized standardized agent: {self.name} (ID: {self.agent_id})")
     
     @property
     def llm_gateway(self):
@@ -366,86 +385,164 @@ class BaseAgent(ABC):
         """Check if this agent has a specific capability."""
         return capability in self._capabilities
     
+    # ==================== STANDARDIZED ABSTRACT METHODS ====================
+    
     @abstractmethod
     async def execute_capability(
         self, 
         capability: AgentCapability, 
         parameters: Dict[str, Any]
+    ) -> StandardAgentOutput:
+        """Execute a specific capability with standardized input/output."""
+        pass
+    
+    @abstractmethod
+    async def process_message(
+        self, 
+        message: str, 
+        context: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Execute a specific capability. Must be implemented by subclasses."""
+        """Process a message and return a response. Legacy method for backward compatibility."""
         pass
     
     @abstractmethod
-    async def process_message(self, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Process a message and return a response. Must be implemented by subclasses."""
+    async def process_standardized_input(
+        self, 
+        agent_input: StandardAgentInput[T]
+    ) -> StandardAgentOutput[T]:
+        """Process standardized input and return standardized output."""
         pass
     
     @abstractmethod
-    async def process_task(self, task: AgentTask) -> Dict[str, Any]:
-        """Process a specific task. Must be implemented by subclasses."""
+    async def handle_standardized_message(
+        self, 
+        message: StandardizedAgentMessage
+    ) -> Optional[StandardizedAgentMessage]:
+        """Handle incoming standardized messages."""
         pass
     
-    @abstractmethod
-    async def handle_message(self, message: AgentMessage) -> Optional[AgentMessage]:
-        """Handle incoming messages. Must be implemented by subclasses."""
-        pass
+    # ==================== TASK EXECUTION METHODS ====================
     
-    async def execute_task(self, task: AgentTask) -> AgentTask:
+    async def execute_standardized_task(
+        self, 
+        task: StandardizedAgentTask
+    ) -> StandardizedAgentTask:
         """
-        Execute a task with proper error handling and status updates.
+        Execute a standardized task with proper error handling and status updates.
         """
-        task.status = AgentStatus.RUNNING
+        task.mark_started()
         self.status = AgentStatus.RUNNING
         
+        start_time = datetime.utcnow()
+        
         try:
-            logger.info(f"Agent {self.name} executing task {task.id}")
+            logger.info(f"Agent {self.name} executing standardized task {task.task_id}")
             
-            # Set timeout
-            result = await asyncio.wait_for(
-                self.process_task(task),
-                timeout=task.timeout
-            )
+            # Process the standardized input
+            result = await self.process_standardized_input(task.input_data)
             
-            task.result = result
-            task.status = AgentStatus.COMPLETED
+            # Update execution metrics
+            execution_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+            result.metadata.execution_time_ms = execution_time
             
-            logger.info(f"Agent {self.name} completed task {task.id}")
+            task.mark_completed(result)
             
-        except asyncio.TimeoutError:
-            task.status = AgentStatus.TIMEOUT
-            task.error = f"Task timed out after {task.timeout} seconds"
-            logger.error(f"Agent {self.name} task {task.id} timed out")
+            # Update performance metrics
+            self.execution_metrics["successful_requests"] += 1
+            self._update_average_response_time(execution_time)
+            
+            logger.info(f"Agent {self.name} completed standardized task {task.task_id}")
             
         except Exception as e:
-            task.status = AgentStatus.FAILED
-            task.error = str(e)
-            logger.error(f"Agent {self.name} task {task.id} failed: {e}")
+            # Create standardized error
+            error = create_agent_error(
+                error_code="TASK_EXECUTION_FAILED",
+                error_message=str(e),
+                agent_id=self.agent_id,
+                capability_name=task.capability.value,
+                processing_stage=ProcessingStage.PROCESSING
+            )
+            
+            task.mark_failed(error)
+            self.execution_metrics["failed_requests"] += 1
+            
+            logger.error(f"Agent {self.name} standardized task {task.task_id} failed: {e}")
             
         finally:
             self.status = AgentStatus.IDLE
+            self.execution_metrics["total_requests"] += 1
         
         return task
     
-    async def send_message(
-        self,
-        recipient: str,
-        message_type: str,
-        content: Dict[str, Any],
-        correlation_id: Optional[str] = None
-    ) -> AgentMessage:
-        """Send a message to another agent."""
-        message = AgentMessage(
-            sender=self.name,
-            recipient=recipient,
-            message_type=message_type,
-            content=content,
-            correlation_id=correlation_id
+    # Legacy method for backward compatibility
+    async def execute_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Legacy task execution method for backward compatibility.
+        Converts to standardized format internally.
+        """
+        # Convert to standardized format
+        agent_input = StandardAgentInput(
+            source_agent_id="legacy",
+            target_agent_id=self.agent_id,
+            capability_name="legacy_processing",
+            data=task_data,
+            context=AgentContext()
         )
         
-        # In a real implementation, this would go through the orchestrator
-        logger.info(f"Agent {self.name} sending message to {recipient}: {message_type}")
+        standardized_task = StandardizedAgentTask(
+            capability=AgentCapability.DATA_QUALITY_ASSESSMENT,  # Default capability
+            input_data=agent_input
+        )
+        
+        # Execute standardized task
+        completed_task = await self.execute_standardized_task(standardized_task)
+        
+        # Return legacy format
+        if completed_task.output_data:
+            return completed_task.output_data.dict()
+        elif completed_task.error:
+            return {"error": completed_task.error.error_message}
+        else:
+            return {"error": "Unknown execution error"}
+    
+    # ==================== MESSAGE HANDLING METHODS ====================
+    
+    async def send_standardized_message(
+        self,
+        recipient_id: str,
+        capability_name: str,
+        content: Dict[str, Any],
+        context: Optional[AgentContext] = None,
+        priority: Priority = Priority.MEDIUM
+    ) -> StandardizedAgentMessage:
+        """Send a standardized message to another agent."""
+        message = StandardizedAgentMessage(
+            message_type=MessageType.REQUEST,
+            sender_id=self.agent_id,
+            recipient_id=recipient_id,
+            capability_name=capability_name,
+            content=content,
+            context=context or AgentContext(),
+            priority=priority
+        )
+        
+        # Add to message queue (in real implementation, would go through message bus)
+        self.message_queue.append(message)
+        
+        logger.info(f"Agent {self.name} sending standardized message to {recipient_id}: {capability_name}")
         
         return message
+    
+    def _update_average_response_time(self, new_time_ms: float):
+        """Update the rolling average response time."""
+        total_requests = self.execution_metrics["total_requests"]
+        if total_requests == 0:
+            self.execution_metrics["average_response_time"] = new_time_ms
+        else:
+            current_avg = self.execution_metrics["average_response_time"]
+            self.execution_metrics["average_response_time"] = (
+                (current_avg * total_requests + new_time_ms) / (total_requests + 1)
+            )
     
     async def generate_llm_response(
         self,
@@ -502,36 +599,70 @@ class BaseAgent(ABC):
             "description": self.description,
             "created_at": self.created_at.isoformat(),
             "message_queue_size": len(self.message_queue),
-            "task_queue_size": len(self.task_queue)
+            "task_queue_size": len(self.task_queue),
+            "execution_metrics": self.execution_metrics
         }
     
-    def add_task(self, task: AgentTask):
-        """Add a task to the agent's queue."""
+    def add_standardized_task(self, task: StandardizedAgentTask):
+        """Add a standardized task to the agent's queue."""
         self.task_queue.append(task)
-        # Sort by priority (higher number = higher priority)
-        self.task_queue.sort(key=lambda t: t.priority, reverse=True)
+        # Sort by priority (higher enum value = higher priority)
+        self.task_queue.sort(key=lambda t: t.priority.value, reverse=True)
     
-    def add_message(self, message: AgentMessage):
-        """Add a message to the agent's queue."""
+    def add_standardized_message(self, message: StandardizedAgentMessage):
+        """Add a standardized message to the agent's queue."""
         self.message_queue.append(message)
     
+    # Legacy methods for backward compatibility
+    def add_task(self, task_data: Dict[str, Any]):
+        """Add a legacy task (converted to standardized format)."""
+        # Convert to standardized format
+        agent_input = StandardAgentInput(
+            source_agent_id="legacy",
+            target_agent_id=self.agent_id,
+            capability_name="legacy_processing",
+            data=task_data,
+            context=AgentContext()
+        )
+        
+        standardized_task = StandardizedAgentTask(
+            capability=AgentCapability.DATA_QUALITY_ASSESSMENT,  # Default capability
+            input_data=agent_input,
+            priority=Priority.MEDIUM
+        )
+        
+        self.add_standardized_task(standardized_task)
+    
+    def add_message(self, message_data: Dict[str, Any]):
+        """Add a legacy message (converted to standardized format)."""
+        standardized_message = StandardizedAgentMessage(
+            message_type=MessageType.REQUEST,
+            sender_id=message_data.get("sender", "unknown"),
+            recipient_id=self.agent_id,
+            capability_name=message_data.get("capability", "legacy_processing"),
+            content=message_data.get("content", {}),
+            context=AgentContext()
+        )
+        
+        self.add_standardized_message(standardized_message)
+    
     async def process_queues(self):
-        """Process pending tasks and messages."""
+        """Process pending standardized tasks and messages."""
         # Process messages first
         while self.message_queue:
             message = self.message_queue.pop(0)
             try:
-                response = await self.handle_message(message)
+                response = await self.handle_standardized_message(message)
                 if response:
-                    # In a real implementation, send response through orchestrator
-                    logger.info(f"Agent {self.name} generated response to message {message.id}")
+                    # In a real implementation, send response through message bus
+                    logger.info(f"Agent {self.name} generated response to message {message.message_id}")
             except Exception as e:
-                logger.error(f"Error handling message {message.id}: {e}")
+                logger.error(f"Error handling message {message.message_id}: {e}")
         
         # Process tasks
         while self.task_queue and self.status == AgentStatus.IDLE:
             task = self.task_queue.pop(0)
-            await self.execute_task(task)
+            await self.execute_standardized_task(task)
 
 
 class AgentRegistry:
@@ -548,6 +679,13 @@ class AgentRegistry:
     def get_agent(self, name: str) -> Optional[BaseAgent]:
         """Get an agent by name."""
         return self.agents.get(name)
+    
+    def get_agent_by_id(self, agent_id: str) -> Optional[BaseAgent]:
+        """Get an agent by ID."""
+        for agent in self.agents.values():
+            if agent.agent_id == agent_id:
+                return agent
+        return None
     
     def list_agents(self) -> List[Dict[str, Any]]:
         """List all registered agents."""

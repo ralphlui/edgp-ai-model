@@ -462,6 +462,84 @@ async def execute_agent_capability(agent_id: str, capability_data: dict):
         )
 
 
+# Standardized Agent Communication Test Endpoint
+@app.post("/api/v2/agents/{agent_id}/standardized")
+async def test_standardized_communication(agent_id: str, request_data: dict):
+    """Test the new standardized agent communication interface."""
+    try:
+        if agent_id == "data_quality_agent":
+            from agents.data_quality.agent import DataQualityAgent
+            from core.types.communication import (
+                StandardAgentInput, DataQualityInput, DataPayload, 
+                OperationParameters, QualityDimension, AgentContext,
+                create_standard_input
+            )
+            
+            agent = DataQualityAgent(agent_id)
+            
+            # Create sample data payload
+            data_payload = DataPayload(
+                data_type=request_data.get("data_type", "tabular"),
+                data_format=request_data.get("data_format", "json"),
+                content=request_data.get("data", {"sample": "data"}),
+                source_system=request_data.get("source", "test_api")
+            )
+            
+            # Create operation parameters
+            operation_params = OperationParameters(
+                quality_threshold=request_data.get("quality_threshold", 0.8),
+                include_recommendations=request_data.get("include_recommendations", True)
+            )
+            
+            # Create data quality input
+            quality_input = DataQualityInput(
+                data_payload=data_payload,
+                operation_parameters=operation_params,
+                quality_dimensions=request_data.get("quality_dimensions", [
+                    QualityDimension.COMPLETENESS,
+                    QualityDimension.ACCURACY,
+                    QualityDimension.CONSISTENCY
+                ]),
+                include_anomaly_detection=request_data.get("include_anomaly_detection", True),
+                include_profiling=request_data.get("include_profiling", True)
+            )
+            
+            # Create standardized input
+            agent_input = create_standard_input(
+                source_agent_id="test_api",
+                target_agent_id=agent_id,
+                capability_name=request_data.get("capability", "data_quality_assessment"),
+                data=quality_input,
+                context=AgentContext()
+            )
+            
+            # Process using new standardized interface
+            result = await agent.process_standardized_input(agent_input)
+            
+            return {
+                "agent_id": agent_id,
+                "interface": "standardized_v2",
+                "result": result.dict(),
+                "timestamp": datetime.utcnow().isoformat(),
+                "success": True
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Agent {agent_id} not found or not supporting standardized interface"
+            )
+            
+    except Exception as e:
+        logger.error(f"Standardized communication test failed: {e}")
+        return {
+            "agent_id": agent_id,
+            "interface": "standardized_v2",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat(),
+            "success": False
+        }
+
+
 # MCP Message endpoints
 @app.post("/messages/send", response_model=MessageResponse)
 async def send_mcp_message(

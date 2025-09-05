@@ -2,7 +2,12 @@
 
 ## Overview
 
-The EDGP AI Model exposes a RESTful API built with FastAPI that provides access to specialized AI agents for master data management. All endpoints use standardized request/response types for consistency and type safety.
+The EDGP AI Model exposes a RESTful API built with FastAPI that provides access to specialized AI agents for master data management. The API now supports two communication interfaces:
+
+1. **Legacy Interface (v1)**: Original agent communication patterns
+2. **Standardized Interface (v2)**: New agentic AI best practices with typed input/output
+
+All endpoints use standardized request/response types for consistency and type safety.
 
 ## Base URL
 
@@ -10,6 +15,20 @@ The EDGP AI Model exposes a RESTful API built with FastAPI that provides access 
 Development: http://localhost:8000
 Production: https://api.edgp-ai.com
 ```
+
+## API Versions
+
+### v1 - Legacy Interface
+- Traditional agent communication
+- Basic parameter passing
+- Limited type safety
+
+### v2 - Standardized Interface (Recommended)
+- Agentic AI best practices
+- Comprehensive type system
+- Full traceability and metadata
+- Performance metrics
+- Enhanced error handling
 
 ## Authentication
 
@@ -673,6 +692,162 @@ The complete OpenAPI specification is available at:
 **GET** `/api/v1/agents/status`
 
 Get detailed status of all agents.
+
+## Standardized Agent Interface (v2)
+
+The new standardized interface follows agentic AI best practices with comprehensive type safety, traceability, and performance monitoring.
+
+### Benefits of v2 Interface
+
+- **Type Safety**: Comprehensive Pydantic models with validation
+- **Traceability**: Full request tracking with correlation IDs
+- **Performance Metrics**: Built-in timing and resource monitoring
+- **Error Handling**: Structured error responses with context
+- **Extensibility**: Generic type system for easy expansion
+
+### Standardized Agent Communication
+
+**POST** `/api/v2/agents/{agent_id}/standardized`
+
+Execute agent capabilities using the standardized communication interface.
+
+**Path Parameters**:
+- `agent_id`: Agent identifier (e.g., "data_quality_agent")
+
+**Request Body**:
+```json
+{
+  "capability": "data_quality_assessment",
+  "data_type": "tabular",
+  "data_format": "json",
+  "data": {
+    "customers": [
+      {"id": 1, "name": "John Doe", "email": "john@example.com"},
+      {"id": 2, "name": "", "email": "invalid-email"}
+    ]
+  },
+  "source": "customer_database",
+  "quality_threshold": 0.8,
+  "include_recommendations": true,
+  "quality_dimensions": ["COMPLETENESS", "ACCURACY", "VALIDITY"],
+  "include_anomaly_detection": true,
+  "include_profiling": true
+}
+```
+
+**Response**:
+```json
+{
+  "agent_id": "data_quality_agent",
+  "interface": "standardized_v2",
+  "result": {
+    "message_id": "msg-123456",
+    "source_agent_id": "test_api",
+    "target_agent_id": "data_quality_agent",
+    "capability_name": "data_quality_assessment",
+    "status": "COMPLETED",
+    "success": true,
+    "data": {
+      "processing_result": {
+        "operation_type": "ASSESSMENT",
+        "primary_output": {
+          "overall_quality_score": 0.75,
+          "dimension_scores": {
+            "COMPLETENESS": 0.5,
+            "ACCURACY": 0.9,
+            "VALIDITY": 0.85
+          }
+        },
+        "key_findings": [
+          "Overall quality score: 0.75",
+          "Total issues found: 2",
+          "Best performing dimension: ACCURACY",
+          "Worst performing dimension: COMPLETENESS"
+        ],
+        "issues_found": [
+          {
+            "dimension": "COMPLETENESS",
+            "score": 0.5,
+            "threshold": 0.8,
+            "severity": "medium"
+          }
+        ],
+        "performance_metrics": {
+          "assessment_time_ms": 1250.0,
+          "records_processed": 2
+        }
+      },
+      "overall_quality_score": 0.75,
+      "improvement_recommendations": [
+        "Address missing data in name field",
+        "Validate email format consistency"
+      ],
+      "priority_actions": [
+        {
+          "action": "Address high-severity quality issues",
+          "priority": "high",
+          "estimated_effort": "medium"
+        }
+      ]
+    },
+    "context": {
+      "session_id": "session-789",
+      "correlation_id": "corr-abc123",
+      "trace_id": "trace-def456",
+      "user_id": "api_user",
+      "request_metadata": {}
+    },
+    "timestamp": "2024-01-15T10:30:00Z"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "success": true
+}
+```
+
+### Supported Capabilities (v2)
+
+#### Data Quality Agent
+- `data_quality_assessment`: Comprehensive quality evaluation
+- `anomaly_detection`: Identify data anomalies and outliers  
+- `data_profiling`: Generate detailed data statistics
+
+#### Request Examples
+
+**Data Quality Assessment**:
+```bash
+curl -X POST "http://localhost:8000/api/v2/agents/data_quality_agent/standardized" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "capability": "data_quality_assessment",
+    "data_type": "tabular",
+    "data": {"sample": "dataset"},
+    "quality_threshold": 0.9,
+    "quality_dimensions": ["COMPLETENESS", "ACCURACY", "CONSISTENCY"]
+  }'
+```
+
+**Anomaly Detection**:
+```bash
+curl -X POST "http://localhost:8000/api/v2/agents/data_quality_agent/standardized" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "capability": "anomaly_detection",
+    "data_type": "timeseries",
+    "data": {"metrics": [1.2, 1.1, 5.8, 1.0]},
+    "include_profiling": false
+  }'
+```
+
+### Type System Reference
+
+The standardized interface uses a comprehensive type system defined in `core/types/communication.py`:
+
+**Key Types**:
+- `StandardAgentInput[T]`: Generic input container
+- `StandardAgentOutput[T]`: Generic output container  
+- `DataQualityInput/Output`: Domain-specific types
+- `AgentContext`: Request tracing and metadata
+- `ProcessingResult`: Execution results and metrics
 
 ### System Logs
 
