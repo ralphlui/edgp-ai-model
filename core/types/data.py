@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 
 from .base import (
     BaseTimestamped, DataType, SensitivityLevel, 
-    Priority, Severity, ConfidenceLevel, TimeRange
+    Priority, Severity, ConfidenceLevel, TimeRange,
+    QualityDimension, DataSourceType, DataFormat, 
+    PolicyType, ComplianceStatus, DataClassification
 )
 
 
@@ -233,3 +235,148 @@ class AnalyticsVisualization(BaseModel):
     summary_stats: Dict[str, Any] = Field(default_factory=dict)
     
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+# Additional models for comprehensive data type testing
+class DataQualityIssue(BaseTimestamped):
+    """Data quality issue model."""
+    issue_id: str = Field(default_factory=lambda: f"issue_{datetime.utcnow().timestamp()}")
+    dimension: QualityDimension
+    severity: Severity
+    description: str
+    column_name: str
+    affected_rows: int
+    recommendation: Optional[str] = None
+    additional_context: Dict[str, Any] = Field(default_factory=dict)
+    detected_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DataQualityMetrics(BaseModel):
+    """Enhanced data quality metrics model."""
+    completeness_score: float = Field(..., ge=0.0, le=1.0)
+    accuracy_score: float = Field(..., ge=0.0, le=1.0)
+    consistency_score: float = Field(..., ge=0.0, le=1.0)
+    validity_score: float = Field(..., ge=0.0, le=1.0)
+    uniqueness_score: float = Field(..., ge=0.0, le=1.0)
+    overall_score: Optional[float] = None
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.overall_score is None:
+            self.overall_score = (
+                self.completeness_score + self.accuracy_score + 
+                self.consistency_score + self.validity_score + 
+                self.uniqueness_score
+            ) / 5.0
+
+
+class ColumnMetadata(BaseModel):
+    """Column metadata model."""
+    name: str
+    data_type: str
+    is_nullable: bool = True
+    is_primary_key: bool = False
+    is_foreign_key: bool = False
+    unique_values: Optional[int] = None
+    min_value: Optional[Union[int, float]] = None
+    max_value: Optional[Union[int, float]] = None
+    mean_value: Optional[float] = None
+    null_count: Optional[int] = None
+    constraints: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+
+
+class DatasetMetadata(BaseTimestamped):
+    """Dataset metadata model."""
+    dataset_id: str = Field(default_factory=lambda: f"dataset_{datetime.utcnow().timestamp()}")
+    name: str
+    source: DataSourceType
+    format: DataFormat
+    columns: List[ColumnMetadata]
+    row_count: Optional[int] = None
+    total_rows: Optional[int] = None
+    database_name: Optional[str] = None
+    schema_name: Optional[str] = None
+    table_name: Optional[str] = None
+    file_path: Optional[str] = None
+    file_format: Optional[DataFormat] = None
+    file_size_bytes: Optional[int] = None
+    last_modified: Optional[datetime] = None
+    description: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+
+
+class DataProfile(BaseTimestamped):
+    """Data profile model."""
+    dataset_metadata: DatasetMetadata
+    quality_metrics: DataQualityMetrics
+    issues: List[DataQualityIssue] = Field(default_factory=list)
+    quality_issues: List[DataQualityIssue] = Field(default_factory=list)  # Alias for backward compatibility
+    profile_id: str = Field(default_factory=lambda: f"profile_{datetime.utcnow().timestamp()}")
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    profiled_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DataValidationRule(BaseTimestamped):
+    """Data validation rule model."""
+    rule_id: str = Field(default_factory=lambda: f"rule_{datetime.utcnow().timestamp()}")
+    name: str
+    description: str
+    rule_type: str
+    column_name: str
+    condition: Optional[str] = None
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    severity: Severity = Severity.MEDIUM
+    is_active: bool = True
+    error_message: Optional[str] = None
+
+
+class DataTransformation(BaseTimestamped):
+    """Data transformation model."""
+    transformation_id: str = Field(default_factory=lambda: f"transform_{datetime.utcnow().timestamp()}")
+    name: str
+    description: str
+    transformation_type: str
+    source_columns: List[str]
+    target_column: Optional[str] = None
+    target_columns: List[str] = Field(default_factory=list)
+    transformation_logic: Optional[str] = None
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class DataLineage(BaseTimestamped):
+    """Data lineage model."""
+    lineage_id: str = Field(default_factory=lambda: f"lineage_{datetime.utcnow().timestamp()}")
+    source_dataset: str
+    target_dataset: str
+    transformation_applied: Optional[str] = None
+    transformation_steps: List[DataTransformation] = Field(default_factory=list)
+    dependencies: List[str] = Field(default_factory=list)
+    upstream_lineage: List[str] = Field(default_factory=list)
+    downstream_lineage: List[str] = Field(default_factory=list)
+    impact_analysis: Dict[str, Any] = Field(default_factory=dict)
+    lineage_type: str = "direct"
+    confidence_level: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PolicyRule(BaseTimestamped):
+    """Policy rule model."""
+    rule_id: str = Field(default_factory=lambda: f"policy_{datetime.utcnow().timestamp()}")
+    name: str
+    description: str
+    policy_type: PolicyType
+    rule_expression: Optional[str] = None
+    severity: Severity = Severity.MEDIUM
+    scope: List[str] = Field(default_factory=list)
+    conditions: List[str] = Field(default_factory=list)
+    actions: List[str] = Field(default_factory=list)
+    priority: Priority = Priority.MEDIUM
+    is_active: bool = True
+    enforcement_level: str = "advisory"
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+
+
+# Add aliases for backward compatibility with enum-style access
+# End of file

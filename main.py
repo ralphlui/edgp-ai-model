@@ -48,6 +48,10 @@ from core.integrations.patterns import (
     service_registry
 )
 from core.services.llm_bridge import llm_bridge, cross_agent_bridge
+from core.services.message_queue import (
+    start_message_queue_service, 
+    stop_message_queue_service
+)
 
 # Configure logging
 logging.basicConfig(
@@ -98,6 +102,10 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing integration orchestrator...")
         await integration_orchestrator.start()
         await service_registry.start_all_adapters()
+        
+        # Initialize message queue service
+        logger.info("Starting message queue service...")
+        await start_message_queue_service()
         
         # Register external services for integration
         from core.integrations.config import integration_config_manager
@@ -157,6 +165,10 @@ async def lifespan(app: FastAPI):
         # Stop integration orchestrator
         await integration_orchestrator.stop()
         await service_registry.stop_all_adapters()
+        
+        # Stop message queue service
+        logger.info("Stopping message queue service...")
+        await stop_message_queue_service()
         
         # Stop MCP message bus
         await mcp_bus.stop_message_processing()
@@ -246,6 +258,10 @@ app.include_router(external_router)
 app.include_router(webhook_router)
 app.include_router(llm_router)
 app.include_router(integration_router)
+
+# Include message queue router
+from core.api.message_queue_endpoints import router as message_queue_router
+app.include_router(message_queue_router)
 
 # Root endpoint
 @app.get("/")

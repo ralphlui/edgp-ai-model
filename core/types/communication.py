@@ -52,6 +52,7 @@ class ProcessingStage(str, Enum):
 class OperationType(str, Enum):
     """Types of operations agents can perform."""
     ANALYSIS = "analysis"
+    ANALYZE = "analysis"  # Alias for backward compatibility
     ASSESSMENT = "assessment"
     GENERATION = "generation"
     TRANSFORMATION = "transformation"
@@ -59,6 +60,22 @@ class OperationType(str, Enum):
     RECOMMENDATION = "recommendation"
     REMEDIATION = "remediation"
     MONITORING = "monitoring"
+    PROCESS = "process"
+    PROCESSING = "processing"
+
+
+class ErrorType(str, Enum):
+    """Types of errors that can occur in agent operations."""
+    VALIDATION_ERROR = "validation_error"
+    PROCESSING_ERROR = "processing_error"
+    CONFIGURATION_ERROR = "configuration_error"
+    DATA_ERROR = "data_error"
+    NETWORK_ERROR = "network_error"
+    TIMEOUT_ERROR = "timeout_error"
+    AUTHENTICATION_ERROR = "authentication_error"
+    AUTHORIZATION_ERROR = "authorization_error"
+    RESOURCE_ERROR = "resource_error"
+    SYSTEM_ERROR = "system_error"
 
 
 # ==================== STANDARDIZED BASE TYPES ====================
@@ -112,12 +129,15 @@ class AgentMetadata(BaseModel):
     """Metadata about the agent and operation."""
     agent_id: str
     agent_version: str = "1.0.0"
-    capability_used: str
-    operation_type: OperationType
+    capability_used: Optional[str] = None
+    capability_name: Optional[str] = None  # Alias for backward compatibility
+    operation_type: Optional[OperationType] = None
     processing_stage: ProcessingStage = ProcessingStage.PROCESSING
     
     # Performance metrics
+    execution_time: Optional[float] = None  # Added for test compatibility
     execution_time_ms: Optional[float] = None
+    memory_usage: Optional[float] = None  # Added for test compatibility
     memory_usage_mb: Optional[float] = None
     tokens_consumed: Optional[int] = None
     api_calls_made: Optional[int] = None
@@ -140,10 +160,16 @@ class StandardAgentInput(BaseModel, Generic[T]):
     
     # Message identification
     message_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))  # Alias for message_id
     message_type: MessageType = MessageType.REQUEST
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
-    # Agent routing
+    # Operation details
+    operation: Optional[OperationType] = None
+    data: T
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Agent routing (required for backward compatibility)
     source_agent_id: str
     target_agent_id: str
     capability_name: str
@@ -152,9 +178,6 @@ class StandardAgentInput(BaseModel, Generic[T]):
     context: AgentContext
     priority: Priority = Priority.MEDIUM
     
-    # Payload data (typed)
-    data: T
-    
     # Validation and constraints
     schema_version: str = "1.0.0"
     expected_output_format: Optional[str] = None
@@ -162,6 +185,62 @@ class StandardAgentInput(BaseModel, Generic[T]):
     
     # Processing preferences
     processing_preferences: Dict[str, Any] = Field(default_factory=dict)
+    
+    def __init__(self, **data):
+        # Ensure request_id and message_id are synchronized
+        if 'request_id' in data and 'message_id' not in data:
+            data['message_id'] = data['request_id']
+        elif 'message_id' in data and 'request_id' not in data:
+            data['request_id'] = data['message_id']
+        super().__init__(**data)
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class StandardAgentOutput(BaseModel, Generic[T]):
+    """Standardized output format for all agent operations."""
+    
+    # Response identification
+    response_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_id: str  # Reference to the original request
+    message_type: MessageType = MessageType.RESPONSE
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Agent information
+    source_agent_id: Optional[str] = None
+    capability_used: Optional[str] = None
+    
+    # Agent metadata
+    agent_metadata: AgentMetadata
+    
+    # Execution status
+    status: Optional[TaskStatus] = None
+    success: bool = True
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    
+    # Results (typed)
+    result: Optional[T] = None
+    
+    # Context (optional)
+    context: Optional[AgentContext] = None
+    
+    # Quality and confidence
+    overall_confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    quality_indicators: Dict[str, float] = Field(default_factory=dict)
+    
+    # Recommendations and next steps
+    recommendations: List[str] = Field(default_factory=list)
+    suggested_next_actions: List[str] = Field(default_factory=list)
+    
+    # Validation and compliance
+    validation_results: Dict[str, Any] = Field(default_factory=dict)
+    compliance_status: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Additional outputs
+    artifacts: List[str] = Field(default_factory=list)  # URLs or references
+    side_effects: List[str] = Field(default_factory=list)
     
     class Config:
         arbitrary_types_allowed = True
@@ -227,60 +306,21 @@ class OperationParameters(BaseModel):
 
 # ==================== STANDARDIZED OUTPUT TYPES ====================
 
-class StandardAgentOutput(BaseModel, Generic[T]):
-    """Standardized output format for all agent operations."""
-    
-    # Response identification
-    response_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    request_id: str  # Reference to the original request
-    message_type: MessageType = MessageType.RESPONSE
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Agent information
-    source_agent_id: str
-    capability_used: str
-    
-    # Execution status
-    status: TaskStatus
-    success: bool
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
-    
-    # Results (typed)
-    result: Optional[T] = None
-    
-    # Metadata and metrics
-    metadata: AgentMetadata
-    
-    # Quality and confidence
-    overall_confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
-    quality_indicators: Dict[str, float] = Field(default_factory=dict)
-    
-    # Recommendations and next steps
-    recommendations: List[str] = Field(default_factory=list)
-    suggested_next_actions: List[str] = Field(default_factory=list)
-    
-    # Validation and compliance
-    validation_results: Dict[str, Any] = Field(default_factory=dict)
-    compliance_status: Dict[str, Any] = Field(default_factory=dict)
-    
-    # Additional outputs
-    artifacts: List[str] = Field(default_factory=list)  # URLs or references
-    side_effects: List[str] = Field(default_factory=list)
-    
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class ProcessingResult(BaseModel):
     """Standardized processing result structure."""
     
     # Result identification
     result_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    operation_type: OperationType
+    operation_type: Optional[OperationType] = None
     
-    # Main results
-    primary_output: Any
+    # Status and basic result info
+    status: TaskStatus
+    result_data: Dict[str, Any] = Field(default_factory=dict)
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    
+    # Main results (for backward compatibility)
+    primary_output: Optional[Any] = None
     secondary_outputs: Dict[str, Any] = Field(default_factory=dict)
     
     # Analysis and insights
@@ -292,6 +332,7 @@ class ProcessingResult(BaseModel):
     issues_found: List[Dict[str, Any]] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
     alerts: List[Dict[str, Any]] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
     
     # Metrics and scores
     performance_metrics: Dict[str, float] = Field(default_factory=dict)
@@ -301,29 +342,64 @@ class ProcessingResult(BaseModel):
     statistics: Dict[str, Any] = Field(default_factory=dict)
     distributions: Dict[str, Any] = Field(default_factory=dict)
     
+    # Timing information
+    processing_time: Optional[float] = None
+    
     # Validation results
     validation_passed: bool = True
     validation_details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CommunicationProtocol(BaseModel):
+    """Communication protocol configuration."""
+    
+    protocol_version: str = "1.0"
+    message_format: str = "json"
+    encoding: str = "utf-8"
+    compression: Optional[str] = None
+    encryption: Optional[str] = None
+    
+    # Message size limits
+    max_message_size_bytes: int = Field(10 * 1024 * 1024, ge=1)  # 10MB default
+    
+    # Timeout settings
+    connection_timeout_seconds: int = Field(30, ge=1)
+    read_timeout_seconds: int = Field(300, ge=1)
+    
+    # Retry configuration
+    max_retries: int = Field(3, ge=0)
+    retry_delay_seconds: float = Field(1.0, ge=0.0)
+    
+    # Quality of service
+    delivery_guarantee: str = "at_least_once"  # exactly_once, at_most_once, at_least_once
+    ordering_guarantee: bool = False
+    
+    # Security settings
+    require_authentication: bool = True
+    require_encryption: bool = False
 
 
 class AgentError(BaseModel):
     """Standardized error information."""
     
     error_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    error_code: str
-    error_type: str
+    error_code: Optional[str] = None
+    error_type: Union[ErrorType, str]
     error_message: str
+    message: str  # Alias for error_message for backward compatibility
     
     # Error context
     occurred_at: datetime = Field(default_factory=datetime.utcnow)
-    processing_stage: ProcessingStage
+    timestamp: datetime = Field(default_factory=datetime.utcnow)  # Alias for occurred_at
+    processing_stage: ProcessingStage = ProcessingStage.PROCESSING
     agent_id: str
-    capability_name: str
+    capability_name: Optional[str] = None
     
     # Error details
     stack_trace: Optional[str] = None
     input_data_snapshot: Optional[Dict[str, Any]] = None
     system_state: Optional[Dict[str, Any]] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
     
     # Recovery information
     is_recoverable: bool = True
@@ -334,6 +410,19 @@ class AgentError(BaseModel):
     severity: Severity = Severity.MEDIUM
     impact_scope: List[str] = Field(default_factory=list)
     affected_operations: List[str] = Field(default_factory=list)
+    
+    def __init__(self, **data):
+        # Ensure message and error_message are synchronized
+        if 'message' in data and 'error_message' not in data:
+            data['error_message'] = data['message']
+        elif 'error_message' in data and 'message' not in data:
+            data['message'] = data['error_message']
+        
+        # Auto-derive error_type from error_code if not provided
+        if 'error_code' in data and 'error_type' not in data and data['error_code']:
+            data['error_type'] = data['error_code'].split('_')[0] if '_' in data['error_code'] else "GENERAL"
+            
+        super().__init__(**data)
 
 
 # ==================== DOMAIN-SPECIFIC INPUT TYPES ====================
@@ -629,49 +718,105 @@ def create_standard_input(
 
 
 def create_standard_output(
-    request_id: str,
-    source_agent_id: str,
-    capability_used: str,
-    status: TaskStatus,
-    success: bool,
+    agent_id: Optional[str] = None,
+    capability_name: Optional[str] = None,
     result: Any = None,
+    request_id: Optional[str] = None,
+    status: Optional[TaskStatus] = None,
+    # Old signature support
+    source_agent_id: Optional[str] = None,
+    capability_used: Optional[str] = None,
+    success: Optional[bool] = None,
     metadata: Optional[AgentMetadata] = None,
     error_code: Optional[str] = None,
     error_message: Optional[str] = None
 ) -> StandardAgentOutput:
     """Create a standardized agent output."""
-    return StandardAgentOutput(
-        request_id=request_id,
-        source_agent_id=source_agent_id,
-        capability_used=capability_used,
-        status=status,
-        success=success,
-        result=result,
-        metadata=metadata or AgentMetadata(
-            agent_id=source_agent_id,
-            capability_used=capability_used,
+    # Handle backward compatibility
+    final_agent_id = agent_id or source_agent_id or "unknown"
+    final_capability = capability_name or capability_used or "unknown"
+    final_status = status or (TaskStatus.COMPLETED if success else TaskStatus.FAILED) if success is not None else TaskStatus.COMPLETED
+    
+    # Create processing result
+    # For backward compatibility, if result is a dict, use it directly
+    # This maintains compatibility with tests that expect result.result to be a dict
+    if isinstance(result, dict):
+        processing_result = result
+    elif result is None:
+        processing_result = ProcessingResult(
+            status=final_status,
+            result_data={},
+            confidence=ConfidenceLevel.HIGH
+        )
+    else:
+        processing_result = result
+        
+    # Create metadata
+    if metadata is None:
+        metadata = AgentMetadata(
+            agent_id=final_agent_id,
+            capability_used=final_capability,
+            capability_name=final_capability,
             operation_type=OperationType.ANALYSIS
-        ),
+        )
+    
+    return StandardAgentOutput(
+        request_id=request_id or str(uuid.uuid4()),
+        agent_metadata=metadata,
+        result=processing_result,
+        status=final_status,
+        source_agent_id=final_agent_id,
+        capability_used=final_capability,
+        success=success if success is not None else True,
         error_code=error_code,
         error_message=error_message
     )
 
 
 def create_agent_error(
-    error_code: str,
-    error_message: str,
-    agent_id: str,
-    capability_name: str,
-    processing_stage: ProcessingStage = ProcessingStage.PROCESSING,
-    severity: Severity = Severity.MEDIUM
+    error_code: Optional[str] = None,
+    error_message: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    capability_name: Optional[str] = None,
+    error_type: Optional[ErrorType] = None,
+    message: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None
 ) -> AgentError:
     """Create a standardized agent error."""
-    return AgentError(
-        error_code=error_code,
-        error_type=error_code.split('_')[0] if '_' in error_code else "GENERAL",
-        error_message=error_message,
-        processing_stage=processing_stage,
-        agent_id=agent_id,
-        capability_name=capability_name,
-        severity=severity
+    # Handle different signatures for backward compatibility
+    if error_type is not None and message is not None:
+        # New signature: error_type, message, agent_id
+        return AgentError(
+            error_type=error_type,
+            error_message=message,
+            message=message,
+            agent_id=agent_id or "unknown",
+            capability_name=capability_name,
+            error_code=error_code,
+            details=details or {}
+        )
+    else:
+        # Old signature: error_code, error_message, agent_id, capability_name
+        derived_error_type = error_code.split('_')[0] if error_code and '_' in error_code else "GENERAL"
+        return AgentError(
+            error_type=derived_error_type,
+            error_message=error_message or "Unknown error",
+            message=error_message or "Unknown error",
+            agent_id=agent_id or "unknown",
+            capability_name=capability_name,
+            error_code=error_code,
+            details=details or {}
+        )
+
+
+def create_agent_context(
+    session_id: str,
+    user_id: str,
+    metadata: Optional[Dict[str, Any]] = None
+) -> AgentContext:
+    """Create a standardized agent context."""
+    return AgentContext(
+        session_id=session_id,
+        user_id=user_id,
+        metadata=metadata or {}
     )

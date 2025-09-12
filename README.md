@@ -12,6 +12,14 @@ Complete integration with LangChain and LangGraph frameworks providing:
 - **State Management**: Advanced state tracking across workflow execution
 - **Performance Monitoring**: Comprehensive metrics and callback tracking
 
+### 📨 **Message Queue Service** (NEW)
+Enterprise-grade message queue integration with AWS SQS:
+- **Multiple Queue Support**: Handle both request and response queues
+- **Runtime AWS Credentials**: Support for environment variable-based AWS authentication
+- **Message Processing**: Automated message consumption and processing
+- **Workflow Triggers**: API endpoints for triggering agent workflows via messages
+- **Queue Monitoring**: Real-time queue statistics and health monitoring
+
 ### 🌟 **Enterprise Shared Services**
 - **Standardized Communication**: Unified agent input/output types
 - **Prompt Engineering**: Template management, A/B testing, and optimization
@@ -254,17 +262,66 @@ cp .env.example .env
 # Edit .env with your API keys and configuration
 ```
 
-4. **AWS Bedrock Setup**:
+4. **Run the application**:
+
+**Option 1: Standard Python execution**
 ```bash
-# Configure AWS credentials
-aws configure
-# Or set environment variables
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_REGION=us-east-1
+python main.py
 ```
 
-5. **Run LangChain Integration Demo**:
+**Option 2: Using the startup script**
+```bash
+python start.py
+```
+
+**Option 3: Runtime environment variables (similar to EDGP rules engine)**
+```bash
+APP_ENV="DEV" AWS_REGION="ap-southeast-1" AWS_ACCESS_KEY_ID="AKIAXXXXXXXX" AWS_SECRET_ACCESS_KEY="your_secret_key" WORKFLOW_RULES_REQUEST_SQS_URL="https://sqs.ap-southeast-1.amazonaws.com/891377185630/test_sqs_queue_input" WORKFLOW_RULES_RESPONSE_SQS_URL="https://sqs.ap-southeast-1.amazonaws.com/891377185630/test_sqs_queue_output" python -m app.main
+```
+
+**Option 4: Using command line arguments**
+```bash
+python start.py --env DEV --aws-region ap-southeast-1 --aws-access-key-id "AKIAXXXXXXXX" --aws-secret-access-key "your_secret_key" --workflow-request-sqs-url "https://sqs.ap-southeast-1.amazonaws.com/891377185630/test_sqs_queue_input"
+```
+
+5. **Access the application**:
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **Message Queue Status**: http://localhost:8000/message-queue/status
+
+### Message Queue Service Usage
+
+**Send a workflow request message**:
+```bash
+curl -X POST "http://localhost:8000/message-queue/trigger-data-quality-assessment" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_id": "dataset_123",
+    "assessment_type": "full"
+  }'
+```
+
+**Check queue status**:
+```bash
+curl "http://localhost:8000/message-queue/status"
+```
+
+**Send custom message**:
+```bash
+curl -X POST "http://localhost:8000/message-queue/send-message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queue_name": "workflow_request",
+    "message_type": "workflow_request", 
+    "source": "api_client",
+    "payload": {
+      "workflow_type": "compliance_check",
+      "data": {"dataset_id": "dataset_456"}
+    }
+  }'
+```
+
+6. **Run LangChain Integration Demo**:
 ```bash
 # Run the comprehensive LangChain/LangGraph integration demonstration
 python examples/langchain_integration_demo.py
@@ -324,7 +381,10 @@ edgp-ai-model/
 │   ├── services/                   # Shared services
 │   │   ├── llm_bridge.py           # LLM abstraction layer
 │   │   ├── llm_gateway.py          # Multi-provider LLM gateway
-│   │   └── rag_system.py           # Advanced RAG system
+│   │   ├── rag_system.py           # Advanced RAG system
+│   │   └── message_queue.py        # AWS SQS message queue service
+│   ├── api/                        # API endpoints
+│   │   └── message_queue_endpoints.py # Message queue REST API
 │   └── types/                      # Type definitions & validation
 │       ├── base.py                 # Base types
 │       ├── data.py                 # Data types
@@ -344,6 +404,15 @@ edgp-ai-model/
 ├── examples/                       # Example implementations & demos
 │   ├── langchain_integration_demo.py # Comprehensive LangChain demo
 │   └── production_config.py        # Production configuration examples
+├── graphs/                         # LangGraph workflow definitions
+│   └── remediation/                # Remediation workflow graphs
+│       ├── __init__.py
+│       ├── base_workflow.py        # Base remediation workflow
+│       ├── automated_workflow.py   # Automated remediation workflows
+│       └── orchestrator.py         # Workflow orchestrator
+├── app/                            # Module entry point
+│   ├── __init__.py
+│   └── main.py                     # Module main entry point
 ├── tests/                          # Test suite
 │   ├── __init__.py
 │   ├── conftest.py                 # Test configuration
@@ -355,11 +424,109 @@ edgp-ai-model/
 ├── docker-compose.yml              # Docker composition
 ├── Dockerfile                      # Container definition
 ├── main.py                         # Application entry point
+├── start.py                        # Enhanced startup script with runtime env support
 ├── .env.example                    # Environment template
 └── README.md                       # This file
 ```
 
 ## 🔧 Development Status
+
+### ✅ **Completed Features**
+- **LangChain/LangGraph Integration**: Complete workflow orchestration and agent architecture
+- **Message Queue Service**: AWS SQS integration with multiple queue support
+- **Shared Services**: All 7 core services implemented and integrated
+- **Agent Architecture**: 5 specialized agents with MCP communication
+- **Runtime Configuration**: Support for environment variable-based deployment
+- **API Endpoints**: RESTful API with comprehensive message queue management
+- **Documentation**: Extensive documentation and examples
+
+### 🔄 **Message Queue Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Message Queue Layer                          │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
+│  │   AWS SQS       │    │  Message Queue  │    │   API Gateway   │ │
+│  │   Queues        │───▶│    Service      │◀───│   Endpoints     │ │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Agent Layer                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
+│  │ Data Quality    │    │   Compliance    │    │   Remediation   │ │
+│  │    Agent        │    │     Agent       │    │     Agent       │ │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Message Queue Features:**
+- **Multiple Queue Support**: Handle request, response, and custom queues
+- **Message Processing**: Automated consumption and processing of SQS messages
+- **Runtime AWS Authentication**: Support for environment-based AWS credentials
+- **Workflow Triggers**: API endpoints for triggering workflows via messages
+- **Queue Monitoring**: Real-time queue statistics and health monitoring
+- **Message Types**: Support for 7 different message types (workflow, compliance, etc.)
+- **Error Handling**: Dead letter queues and retry mechanisms
+
+### 🚨 **Troubleshooting**
+
+**Common Issues and Solutions:**
+
+1. **AWS Credentials Error**
+   ```bash
+   # Error: NoCredentialsError: Unable to locate credentials
+   # Solution: Set AWS credentials
+   export AWS_ACCESS_KEY_ID="your_key"
+   export AWS_SECRET_ACCESS_KEY="your_secret"
+   export AWS_REGION="your_region"
+   ```
+
+2. **SQS Queue Access Denied**
+   ```bash
+   # Error: AccessDenied when accessing SQS queue
+   # Solution: Verify queue URL and IAM permissions
+   # Ensure the AWS credentials have sqs:SendMessage, sqs:ReceiveMessage permissions
+   ```
+
+3. **Module Import Error**
+   ```bash
+   # Error: ModuleNotFoundError when running python -m app.main
+   # Solution: Ensure you're in the project root directory
+   cd /path/to/edgp-ai-model
+   python -m app.main
+   ```
+
+4. **Port Already in Use**
+   ```bash
+   # Error: Address already in use
+   # Solution: Use a different port
+   python start.py --port 8001
+   ```
+
+5. **Message Queue Not Processing**
+   ```bash
+   # Check queue status
+   curl "http://localhost:8000/message-queue/status"
+   # Verify AWS credentials and queue URLs in logs
+   ```
+
+**Environment Variable Examples:**
+```bash
+# Minimal setup for testing
+APP_ENV="DEV" AWS_REGION="us-east-1" python -m app.main
+
+# Full production setup
+APP_ENV="PROD" \
+AWS_REGION="ap-southeast-1" \
+AWS_ACCESS_KEY_ID="AKIAXXXXXXXX" \
+AWS_SECRET_ACCESS_KEY="your_secret_key" \
+WORKFLOW_RULES_REQUEST_SQS_URL="https://sqs.ap-southeast-1.amazonaws.com/123456789/requests" \
+WORKFLOW_RULES_RESPONSE_SQS_URL="https://sqs.ap-southeast-1.amazonaws.com/123456789/responses" \
+python -m app.main
+```
 
 This is currently a **repository skeleton** with placeholder implementations. Each agent contains:
 - ✅ Agent class structure

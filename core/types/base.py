@@ -88,6 +88,26 @@ class ComplianceRegulation(str, Enum):
     GLBA = "glba"
 
 
+class DataSourceType(str, Enum):
+    """Data source types."""
+    DATABASE = "database"
+    FILE = "file"
+    API = "api"
+    STREAM = "stream"
+    CLOUD_STORAGE = "cloud_storage"
+
+
+class DataFormat(str, Enum):
+    """Data format types."""
+    CSV = "csv"
+    JSON = "json"
+    PARQUET = "parquet"
+    XML = "xml"
+    AVRO = "avro"
+    EXCEL = "excel"
+    TSV = "tsv"
+
+
 class QualityDimension(str, Enum):
     """Data quality dimensions."""
     COMPLETENESS = "completeness"
@@ -96,6 +116,33 @@ class QualityDimension(str, Enum):
     TIMELINESS = "timeliness"
     VALIDITY = "validity"
     UNIQUENESS = "uniqueness"
+
+
+class PolicyType(str, Enum):
+    """Policy types."""
+    DATA_GOVERNANCE = "data_governance"
+    PRIVACY = "privacy"
+    SECURITY = "security"
+    RETENTION = "retention"
+    ACCESS_CONTROL = "access_control"
+
+
+class ComplianceStatus(str, Enum):
+    """Compliance status."""
+    COMPLIANT = "compliant"
+    NON_COMPLIANT = "non_compliant"
+    PARTIALLY_COMPLIANT = "partially_compliant"
+    UNKNOWN = "unknown"
+    PENDING_REVIEW = "pending_review"
+
+
+class DataClassification(str, Enum):
+    """Data classification levels."""
+    PUBLIC = "public"
+    INTERNAL = "internal"
+    CONFIDENTIAL = "confidential"
+    RESTRICTED = "restricted"
+    TOP_SECRET = "top_secret"
 
 
 class RemediationType(str, Enum):

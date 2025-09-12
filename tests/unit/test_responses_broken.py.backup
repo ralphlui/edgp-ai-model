@@ -1,0 +1,506 @@
+"""
+Unit tests for core.types.responses module.
+"""
+import pytest
+from unittest.mock import Mock
+from datetime import datetime
+import pytest
+from datetime import datetime
+from typing import Dict, Any, List
+from core.types.responses import (
+    StandardResponse,
+    ErrorResponse,
+    HealthResponse,
+    MetricsResponse,
+    ValidationError
+)
+
+
+class TestStandardResponse:
+    """Test StandardResponse model."""
+    
+    def test_standard_response_creation(self):
+        """Test creating StandardResponse."""
+        response = StandardResponse(
+            success=True,
+            message="Operation completed successfully",
+            request_id="test_request_123"
+        )
+        
+        assert response.success is True
+        assert response.message == "Operation completed successfully"
+        assert response.request_id == "test_request_123"
+        assert response.timestamp is not None
+        assert response.data is None
+        assert response.errors == []
+    
+    def test_standard_response_with_data(self):
+        """Test StandardResponse with data."""
+        data = {"result": "test_result", "count": 42}
+        response = StandardResponse(
+            success=True,
+            message="Data retrieved",
+            request_id="test_request_456",
+            data=data
+        )
+        
+        assert response.data == data
+    
+    def test_standard_response_with_errors(self):
+        """Test StandardResponse with errors."""
+        errors = ["Error 1", "Error 2"]
+        response = StandardResponse(
+            success=False,
+            message="Operation failed",
+            request_id="test_request_789",
+            errors=errors
+        )
+        
+        assert response.success is False
+        assert response.errors == errors
+
+
+class TestErrorResponse:
+    """Test ErrorResponse model."""
+    
+    def test_error_response_creation(self):
+        """Test creating ErrorResponse."""
+        response = ErrorResponse(
+            error_code="VALIDATION_ERROR",
+            error_message="Invalid input data",
+            request_id="error_request_123"
+        )
+        
+        assert response.success is False
+        assert response.error_code == "VALIDATION_ERROR"
+        assert response.error_message == "Invalid input data"
+        assert response.request_id == "error_request_123"
+        assert response.timestamp is not None
+        assert response.details == {}
+    
+    def test_error_response_with_details(self):
+        """Test ErrorResponse with details."""
+        details = {"field": "email", "expected": "valid email format"}
+        response = ErrorResponse(
+            error_code="VALIDATION_ERROR",
+            error_message="Invalid email",
+            request_id="error_request_456",
+            details=details
+        )
+        
+        assert response.details == details
+    
+    def test_error_response_with_stack_trace(self):
+        """Test ErrorResponse with stack trace."""
+        stack_trace = "Traceback (most recent call last):\\n  File..."
+        response = ErrorResponse(
+            error_code="PROCESSING_ERROR",
+            error_message="Internal error",
+            request_id="error_request_789",
+            stack_trace=stack_trace
+        )
+        
+        assert response.stack_trace == stack_trace
+
+
+class TestSuccessResponse:
+    """Test SuccessResponse model."""
+    
+    def test_success_response_creation(self):
+        """Test creating SuccessResponse."""
+        data = {"processed_items": 100, "status": "completed"}
+        response = SuccessResponse(
+            message="Processing completed successfully",
+            data=data,
+            request_id="success_request_123"
+        )
+        
+        assert response.success is True
+        assert response.message == "Processing completed successfully"
+        assert response.data == data
+        assert response.request_id == "success_request_123"
+        assert response.timestamp is not None
+    
+    def test_success_response_with_metadata(self):
+        """Test SuccessResponse with metadata."""
+        data = {"result": "success"}
+        metadata = {"execution_time": 2.5, "memory_used": 1024}
+        response = SuccessResponse(
+            message="Operation successful",
+            data=data,
+            request_id="success_request_456",
+            metadata=metadata
+        )
+        
+        assert response.metadata == metadata
+
+
+class TestDataResponse:
+    """Test DataResponse model."""
+    
+    def test_data_response_creation(self):
+        """Test creating DataResponse."""
+        items = [{"id": 1, "name": "Item 1"}, {"id": 2, "name": "Item 2"}]
+        response = DataResponse(
+            items=items,
+            total_count=2,
+            request_id="data_request_123"
+        )
+        
+        assert response.success is True
+        assert response.items == items
+        assert response.total_count == 2
+        assert response.request_id == "data_request_123"
+        assert response.page_size is None
+        assert response.page_number is None
+    
+    def test_data_response_with_pagination(self):
+        """Test DataResponse with pagination."""
+        items = [{"id": 1, "name": "Item 1"}]
+        response = DataResponse(
+            items=items,
+            total_count=100,
+            page_size=10,
+            page_number=1,
+            request_id="data_request_456"
+        )
+        
+        assert response.page_size == 10
+        assert response.page_number == 1
+        assert response.total_count == 100
+    
+    def test_data_response_empty(self):
+        """Test DataResponse with no items."""
+        response = DataResponse(
+            items=[],
+            total_count=0,
+            request_id="data_request_789"
+        )
+        
+        assert response.items == []
+        assert response.total_count == 0
+
+
+class TestValidationResponse:
+    """Test ValidationResponse model."""
+    
+    def test_validation_response_valid(self):
+        """Test ValidationResponse for valid data."""
+        response = ValidationResponse(
+            is_valid=True,
+            message="Data validation passed",
+            request_id="validation_request_123"
+        )
+        
+        assert response.success is True
+        assert response.is_valid is True
+        assert response.message == "Data validation passed"
+        assert response.validation_errors == []
+        assert response.warnings == []
+    
+    def test_validation_response_invalid(self):
+        """Test ValidationResponse for invalid data."""
+        validation_errors = [
+            {"field": "email", "message": "Invalid format"},
+            {"field": "age", "message": "Must be positive"}
+        ]
+        warnings = [
+            {"field": "phone", "message": "Unusual format"}
+        ]
+        
+        response = ValidationResponse(
+            is_valid=False,
+            message="Data validation failed",
+            validation_errors=validation_errors,
+            warnings=warnings,
+            request_id="validation_request_456"
+        )
+        
+        assert response.success is False
+        assert response.is_valid is False
+        assert response.validation_errors == validation_errors
+        assert response.warnings == warnings
+    
+    def test_validation_response_with_suggestions(self):
+        """Test ValidationResponse with suggestions."""
+        suggestions = [
+            {"field": "email", "suggestion": "Use format: user@domain.com"},
+            {"field": "phone", "suggestion": "Include country code"}
+        ]
+        
+        response = ValidationResponse(
+            is_valid=False,
+            message="Validation failed with suggestions",
+            suggestions=suggestions,
+            request_id="validation_request_789"
+        )
+        
+        assert response.suggestions == suggestions
+
+
+class TestComplianceResponse:
+    """Test ComplianceResponse model."""
+    
+    def test_compliance_response_compliant(self):
+        """Test ComplianceResponse for compliant data."""
+        response = ComplianceResponse(
+            is_compliant=True,
+            compliance_score=0.95,
+            message="Data meets all compliance requirements",
+            request_id="compliance_request_123"
+        )
+        
+        assert response.success is True
+        assert response.is_compliant is True
+        assert response.compliance_score == 0.95
+        assert response.violations == []
+        assert response.recommendations == []
+    
+    def test_compliance_response_non_compliant(self):
+        """Test ComplianceResponse for non-compliant data."""
+        violations = [
+            {"rule": "GDPR_CONSENT", "severity": "HIGH", "description": "Missing consent"},
+            {"rule": "PII_ENCRYPTION", "severity": "MEDIUM", "description": "Unencrypted PII"}
+        ]
+        recommendations = [
+            {"action": "obtain_consent", "priority": "HIGH"},
+            {"action": "encrypt_pii", "priority": "MEDIUM"}
+        ]
+        
+        response = ComplianceResponse(
+            is_compliant=False,
+            compliance_score=0.45,
+            message="Compliance violations found",
+            violations=violations,
+            recommendations=recommendations,
+            request_id="compliance_request_456"
+        )
+        
+        assert response.success is False
+        assert response.is_compliant is False
+        assert response.compliance_score == 0.45
+        assert response.violations == violations
+        assert response.recommendations == recommendations
+    
+    def test_compliance_response_with_regulations(self):
+        """Test ComplianceResponse with specific regulations."""
+        regulations_checked = ["GDPR", "CCPA", "PIPEDA"]
+        response = ComplianceResponse(
+            is_compliant=True,
+            compliance_score=0.98,
+            message="Compliant with all regulations",
+            regulations_checked=regulations_checked,
+            request_id="compliance_request_789"
+        )
+        
+        assert response.regulations_checked == regulations_checked
+
+
+class TestAgentResponse:
+    """Test AgentResponse model."""
+    
+    def test_agent_response_creation(self):
+        """Test creating AgentResponse."""
+        result = {"analysis": "completed", "findings": 5}
+        response = AgentResponse(
+            agent_id="data_quality_agent",
+            capability_used="quality_assessment",
+            result=result,
+            request_id="agent_request_123"
+        )
+        
+        assert response.success is True
+        assert response.agent_id == "data_quality_agent"
+        assert response.capability_used == "quality_assessment"
+        assert response.result == result
+        assert response.execution_time is None
+        assert response.confidence_score is None
+    
+    def test_agent_response_with_metrics(self):
+        """Test AgentResponse with performance metrics."""
+        result = {"status": "completed"}
+        response = AgentResponse(
+            agent_id="analytics_agent",
+            capability_used="trend_analysis",
+            result=result,
+            execution_time=1.5,
+            confidence_score=0.92,
+            request_id="agent_request_456"
+        )
+        
+        assert response.execution_time == 1.5
+        assert response.confidence_score == 0.92
+    
+    def test_agent_response_with_metadata(self):
+        """Test AgentResponse with metadata."""
+        result = {"output": "analysis_complete"}
+        metadata = {
+            "model_version": "1.2.0",
+            "data_points_analyzed": 10000,
+            "memory_used": 2048
+        }
+        
+        response = AgentResponse(
+            agent_id="ml_agent",
+            capability_used="prediction",
+            result=result,
+            metadata=metadata,
+            request_id="agent_request_789"
+        )
+        
+        assert response.metadata == metadata
+
+
+class TestWorkflowResponse:
+    """Test WorkflowResponse model."""
+    
+    def test_workflow_response_creation(self):
+        """Test creating WorkflowResponse."""
+        steps = [
+            {"step": "validation", "status": "completed", "duration": 0.5},
+            {"step": "processing", "status": "completed", "duration": 2.0},
+            {"step": "output", "status": "completed", "duration": 0.3}
+        ]
+        
+        response = WorkflowResponse(
+            workflow_id="data_pipeline_workflow",
+            status="completed",
+            steps=steps,
+            request_id="workflow_request_123"
+        )
+        
+        assert response.success is True
+        assert response.workflow_id == "data_pipeline_workflow"
+        assert response.status == "completed"
+        assert response.steps == steps
+        assert response.total_execution_time is None
+        assert response.final_result is None
+    
+    def test_workflow_response_with_timing(self):
+        """Test WorkflowResponse with timing information."""
+        steps = [{"step": "process", "status": "completed"}]
+        response = WorkflowResponse(
+            workflow_id="quick_workflow",
+            status="completed",
+            steps=steps,
+            total_execution_time=5.2,
+            request_id="workflow_request_456"
+        )
+        
+        assert response.total_execution_time == 5.2
+    
+    def test_workflow_response_with_result(self):
+        """Test WorkflowResponse with final result."""
+        steps = [{"step": "analyze", "status": "completed"}]
+        final_result = {
+            "summary": "Analysis complete",
+            "quality_score": 0.85,
+            "recommendations": ["improve_data_collection"]
+        }
+        
+        response = WorkflowResponse(
+            workflow_id="analysis_workflow",
+            status="completed",
+            steps=steps,
+            final_result=final_result,
+            request_id="workflow_request_789"
+        )
+        
+        assert response.final_result == final_result
+    
+    def test_workflow_response_failed(self):
+        """Test WorkflowResponse for failed workflow."""
+        steps = [
+            {"step": "validation", "status": "completed"},
+            {"step": "processing", "status": "failed", "error": "Invalid data format"}
+        ]
+        
+        response = WorkflowResponse(
+            workflow_id="failed_workflow",
+            status="failed",
+            steps=steps,
+            error_message="Processing step failed",
+            request_id="workflow_request_failed"
+        )
+        
+        assert response.success is False
+        assert response.status == "failed"
+        assert response.error_message == "Processing step failed"
+
+
+class TestResponseIntegration:
+    """Test response integration scenarios."""
+    
+    def test_error_to_standard_response_conversion(self):
+        """Test converting ErrorResponse concepts to StandardResponse."""
+        # Simulate error scenario
+        error_response = ErrorResponse(
+            error_code="DATA_QUALITY_ERROR",
+            error_message="Quality check failed",
+            request_id="integration_test_1",
+            details={"threshold": 0.8, "actual": 0.6}
+        )
+        
+        # Convert to standard response format
+        standard_response = StandardResponse(
+            success=False,
+            message=error_response.error_message,
+            request_id=error_response.request_id,
+            errors=[f"{error_response.error_code}: {error_response.error_message}"]
+        )
+        
+        assert standard_response.success is False
+        assert standard_response.request_id == error_response.request_id
+        assert len(standard_response.errors) == 1
+    
+    def test_agent_to_workflow_response_aggregation(self):
+        """Test aggregating agent responses into workflow response."""
+        # Simulate multiple agent responses
+        agent_responses = [
+            AgentResponse(
+                agent_id="quality_agent",
+                capability_used="assessment",
+                result={"score": 0.9},
+                execution_time=1.2,
+                request_id="step_1"
+            ),
+            AgentResponse(
+                agent_id="compliance_agent", 
+                capability_used="validation",
+                result={"compliant": True},
+                execution_time=0.8,
+                request_id="step_2"
+            )
+        ]
+        
+        # Aggregate into workflow response
+        workflow_steps = [
+            {
+                "step": "quality_assessment",
+                "agent_id": agent_responses[0].agent_id,
+                "status": "completed",
+                "duration": agent_responses[0].execution_time,
+                "result": agent_responses[0].result
+            },
+            {
+                "step": "compliance_check",
+                "agent_id": agent_responses[1].agent_id,
+                "status": "completed", 
+                "duration": agent_responses[1].execution_time,
+                "result": agent_responses[1].result
+            }
+        ]
+        
+        total_time = sum(r.execution_time for r in agent_responses)
+        
+        workflow_response = WorkflowResponse(
+            workflow_id="data_validation_pipeline",
+            status="completed",
+            steps=workflow_steps,
+            total_execution_time=total_time,
+            request_id="workflow_integration_test"
+        )
+        
+        assert len(workflow_response.steps) == 2
+        assert workflow_response.total_execution_time == 2.0
+        assert workflow_response.status == "completed"

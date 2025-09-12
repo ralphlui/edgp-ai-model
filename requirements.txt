@@ -50,7 +50,6 @@ scikit-learn>=1.4.0
 redis==5.0.1
 
 # Async and networking
-httpx==0.25.2
 aiohttp==3.9.1
 websockets==12.0
 
@@ -63,6 +62,8 @@ psutil==5.9.6      # For system monitoring
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-mock==3.12.0
+moto[sqs]==4.2.14     # AWS service mocking for testing
+httpx==0.25.2         # For FastAPI test client
 black==23.11.0
 flake8==6.1.0
 mypy==1.7.1

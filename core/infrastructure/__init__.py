@@ -10,9 +10,19 @@ settings = get_global_settings()
 
 # Gracefully handle optional dependencies
 try:
+    from . import auth
     from .auth import AuthManager
-except ImportError:
+    # Verify auth module loaded properly
+    if hasattr(auth, 'pwd_context'):
+        auth_available = True
+    else:
+        auth = None
+        AuthManager = None
+        auth_available = False
+except (ImportError, AttributeError):
+    auth = None
     AuthManager = None
+    auth_available = False
 
 try:
     from .monitoring import monitor, metrics_collector
@@ -27,6 +37,7 @@ except ImportError:
 
 __all__ = [
     "settings",
+    "auth",
     "AuthManager",
     "monitor", 
     "metrics_collector",

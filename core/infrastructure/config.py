@@ -40,7 +40,19 @@ class Settings(BaseSettings):
     aws_profile: Optional[str] = Field(default=None, alias="AWS_PROFILE")
     bedrock_model_id: str = Field(default="anthropic.claude-3-sonnet-20240229-v1:0", alias="BEDROCK_MODEL_ID")
     
+    # SQS Queue Configuration
+    workflow_rules_request_sqs_url: Optional[str] = Field(default=None, alias="WORKFLOW_RULES_REQUEST_SQS_URL")
+    workflow_rules_response_sqs_url: Optional[str] = Field(default=None, alias="WORKFLOW_RULES_RESPONSE_SQS_URL")
+    
+    # Application Environment
+    app_env: str = Field(default="DEV", alias="APP_ENV")
+    
     default_llm_provider: str = Field(default="bedrock", alias="DEFAULT_LLM_PROVIDER")
+    
+    # Authentication Configuration
+    SECRET_KEY: str = Field(default="your-secret-key-here-change-in-production", alias="SECRET_KEY")
+    ALGORITHM: str = Field(default="HS256", alias="ALGORITHM")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     default_model: str = Field(default="gpt-4", alias="DEFAULT_MODEL")
     
     # Database Configuration

@@ -15,7 +15,8 @@ from core.types.base import AgentType
 from core.types.communication import (
     StandardAgentInput, StandardAgentOutput, DataQualityInput, DataQualityOutput,
     ProcessingResult, AgentMetadata, OperationType, ConfidenceLevel,
-    TaskStatus, Priority, QualityDimension, create_standard_output, create_agent_error
+    TaskStatus, Priority, QualityDimension, create_standard_output, create_agent_error,
+    AgentContext, DataPayload, OperationParameters
 )
 
 logger = logging.getLogger(__name__)
@@ -398,51 +399,6 @@ class DataQualityAgent(BaseAgent):
                 "Consider adding data validation rules"
             ]
         )
-    
-    # ==================== LEGACY COMPATIBILITY METHODS ====================
-    
-    async def execute_capability(
-        self, 
-        capability: AgentCapability, 
-        parameters: Dict[str, Any]
-    ) -> StandardAgentOutput:
-        """Legacy capability execution method."""
-        # Convert parameters to standardized input format
-        from core.types.communication import DataPayload, OperationParameters
-        
-        data_payload = DataPayload(
-            data_type="legacy",
-            data_format="json",
-            content=parameters.get("data", {}),
-            source_system=parameters.get("source", "legacy")
-        )
-        
-        operation_parameters = OperationParameters(
-            quality_threshold=parameters.get("quality_threshold", 0.8),
-            include_recommendations=parameters.get("include_recommendations", True)
-        )
-        
-        quality_input = DataQualityInput(
-            data_payload=data_payload,
-            operation_parameters=operation_parameters,
-            quality_dimensions=[
-                QualityDimension.COMPLETENESS,
-                QualityDimension.ACCURACY,
-                QualityDimension.CONSISTENCY
-            ]
-        )
-        
-        # Create standardized input
-        agent_input = StandardAgentInput(
-            source_agent_id="legacy",
-            target_agent_id=self.agent_id,
-            capability_name=capability.value,
-            data=quality_input,
-            context=AgentContext()
-        )
-        
-        # Process and return result
-        return await self.process_standardized_input(agent_input)
     
     # ==================== HELPER METHODS ====================
     

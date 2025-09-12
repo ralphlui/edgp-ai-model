@@ -88,7 +88,7 @@ async def test_standardized_data_quality_assessment():
     print(f"   Target Agent: {agent_input.target_agent_id}")
     print(f"   Capability: {agent_input.capability_name}")
     print(f"   Message ID: {agent_input.message_id}")
-    print(f"   Execution Mode: {agent_input.execution_mode}")
+    print(f"   Execution Mode: {agent_input.context.execution_mode}")
     print(f"   Quality Dimensions: {[d.value for d in quality_input.quality_dimensions]}")
     print()
     

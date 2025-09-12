@@ -123,6 +123,7 @@ class BaseAgent(ABC, Generic[T]):
             self.agent_id = str(uuid.uuid4())
         
         self.capabilities = capabilities or []
+        self._capabilities = capabilities or []  # Also set _capabilities for internal methods
         self.status = AgentStatus.INITIALIZING
         self.created_at = datetime.utcnow()
         
@@ -385,6 +386,20 @@ class BaseAgent(ABC, Generic[T]):
         """Check if this agent has a specific capability."""
         return capability in self._capabilities
     
+    def __repr__(self) -> str:
+        """Return string representation of the agent."""
+        return f"<{self.__class__.__name__} name='{self.name}' id='{self.agent_id}' status='{self.status.value}'>"
+    
+    def __eq__(self, other: object) -> bool:
+        """Check equality based on agent type and name."""
+        if not isinstance(other, BaseAgent):
+            return False
+        return self.agent_type == other.agent_type and self.name == other.name
+    
+    def __hash__(self) -> int:
+        """Hash based on agent type and name."""
+        return hash((self.agent_type, self.name))
+
     # ==================== STANDARDIZED ABSTRACT METHODS ====================
     
     @abstractmethod

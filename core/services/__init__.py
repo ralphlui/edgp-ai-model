@@ -4,11 +4,23 @@ Core services for the EDGP AI Model.
 
 # Import services individually to avoid circular dependencies
 from .llm_gateway import llm_gateway, LLMResponse
-from .llm_bridge import llm_bridge, cross_agent_bridge
+
+# Import message queue service 
+from .message_queue import (
+    MessageQueueService, QueueMessage, MessageType, 
+    get_message_queue_service, send_message, receive_messages,
+    register_queue, register_message_handler
+)
 
 __all__ = [
     "llm_gateway",
     "LLMResponse", 
-    "llm_bridge",
-    "cross_agent_bridge"
+    "MessageQueueService",
+    "QueueMessage", 
+    "MessageType",
+    "get_message_queue_service",
+    "send_message",
+    "receive_messages", 
+    "register_queue",
+    "register_message_handler"
 ]
